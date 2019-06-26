@@ -1,0 +1,1 @@
+g++ -o interfuzzer.out -std=c++17 -O3 -pthread main.cpp
