@@ -160,6 +160,6 @@ class Fuzzer
 
             auto end = std::chrono::system_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            PrettyPrint::PrintInfo("Fuzzing operation completed in [%I64d ms].", duration.count());
+            PrettyPrint::PrintInfo("Fuzzing operation completed in [%d ms].", duration.count());
         }
 };

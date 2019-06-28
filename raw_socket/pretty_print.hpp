@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <mutex>
 
 namespace PrettyPrint
 {
@@ -12,11 +13,12 @@ namespace PrettyPrint
         ENUM_DEBUG      = 3u
     };
 
-    std::vector<std::string> print_formats = {
-        "\e[97;1m[\e[32m   INFO\e[97m]:\t\e[0m",
-        "\e[97;1m[\e[33mWARNING\e[97m]:\t\e[0m",
-        "\e[97;1m[\e[31m  ERROR\e[97m]:\t\e[0m",
-        "\e[97;1m[\e[36m  DEBUG\e[97m]:\t\e[0m",
+    static std::mutex io_mutex;
+    static std::vector<std::string> print_formats = {
+        "\e[97;1m[\e[32m   INFO\e[97m]:  \e[0m",
+        "\e[97;1m[\e[33mWARNING\e[97m]:  \e[0m",
+        "\e[97;1m[\e[31m  ERROR\e[97m]:  \e[0m",
+        "\e[97;1m[\e[36m  DEBUG\e[97m]:  \e[0m",
     };
 
     template <typename... Args>
@@ -28,9 +30,11 @@ namespace PrettyPrint
         if(type > 0x03u)
             return;
 
+        io_mutex.lock();
         printf("%s", print_formats[type].c_str());
         printf(format, args...);
         printf("\n");
+        io_mutex.unlock();
     }
 
     template <typename... Args>

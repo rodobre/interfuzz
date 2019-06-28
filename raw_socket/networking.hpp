@@ -316,13 +316,13 @@ class RawSocket
         {
             ssize_t written_bytes = write(sock, &packet[0], packet.size());
             if(written_bytes != static_cast<ssize_t>(packet.size()))
-                return -1;
+                return written_bytes;
         }
 
         int64_t WritePacket(const uint8_t* buf, const ssize_t len)
         {
             ssize_t written_bytes = write(sock, buf, len);
             if(written_bytes != len)
-                return -1;
+                return written_bytes;
         }
 };

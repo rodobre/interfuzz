@@ -1,2 +1,4 @@
 *.out
 raw_socket/*.out
+raw_socket/.vscode/*
+raw_socket/.vscode/settings.json

@@ -6,6 +6,9 @@
 #include "fuzzer.hpp"
 #include "xorshift_prng.hpp"
 #include <mutex>
+#include <errno.h>
+
+//#define EXTREME_VERBOSITY
 
 int main()
 {
@@ -16,8 +19,8 @@ int main()
 
         std::vector<uint8_t> data_to_send({'P', 'W', 'N', 'E', 'D', '!'});
 
-        auto ether_header   = NetworkHelpers::CreateEthernetHeader("aa:aa:aa:aa:aa:aa",
-                                         "bb:bb:bb:bb:bb:bb", ETHERTYPE_IP);
+        auto ether_header   = NetworkHelpers::CreateEthernetHeader("aa:bb:cc:dd:ee:ff",
+                                         "ff:ee:dd:cc:bb:aa", ETHERTYPE_IP);
         auto ip_header      = NetworkHelpers::CreateIPHeader("192.168.1.2", "192.168.1.3",
                                         data_to_send.size());
         auto tcp_header     = NetworkHelpers::CreateTCPHeader(1337u, 1337u, 1337u, 1337u, 1337u);
@@ -72,10 +75,12 @@ int main()
                 const uint64_t tcp_hdr_size         = sizeof(struct tcphdr);
                 const uint64_t full_size            = raw_bytes.size();
                 const uint64_t tcp_checksum_size    = raw_bytes.size() - eth_hdr_size;
+                const uint64_t data_size            = data_to_send.size();
+                uint64_t packets_sent               = 0;
 
                 std::vector<uint8_t> backup_vector  = raw_bytes;
 
-                PrettyPrint::PrintInfo("Thread [%d] preparing to fuzz bit mask [%ull - %ull]",
+                PrettyPrint::PrintInfo("Thread [%d] preparing to fuzz bit mask [%u - %u]",
                                             thr_id, thread_lower_bound, thread_upper_bound);
 
                 uint64_t current_seed = 0x0llu, tmp_bit = 0x0llu, diff = 0x0llu, old_seed = 0x0llu;
@@ -132,10 +137,29 @@ int main()
                         #ifdef EXTREME_VERBOSITY
                         result = sock.WritePacket(backup_vector);
                         if(result != 0)
-                            PrettyPrint::PrintError("Could not send packet [%d] from thread [%d] with error [%d].",
-                                i, thr_id, result);
+                        {
+                            PrettyPrint::PrintError(
+                                "Could not send packet [%d] from thread [%d] with result [%d] and error [%d].",
+                                i, thr_id, result, errno);
+                        
+                            uint8_t dump_buf[512u] = {};
+                            for(uint16_t i = 0; i < backup_vector.size(); ++i)
+                            {
+                                char buf[6] = {};
+                                snprintf(buf, 5, " %02x", backup_vector[i]);
+                                strcat((char*)dump_buf, buf);
+                            }
+
+                            PrettyPrint::PrintDebug((char*)dump_buf);
+                        }
+                        else
+                            ++ packets_sent;
+                        
                         #else
-                        sock.WritePacket(backup_vector);
+                        result = sock.WritePacket(backup_vector);
+
+                        if(result == full_size)
+                            ++ packets_sent;
                         #endif
                     }
 
