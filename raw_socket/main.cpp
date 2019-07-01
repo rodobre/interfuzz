@@ -8,10 +8,12 @@
 #include <mutex>
 #include <errno.h>
 
-//#define EXTREME_VERBOSITY
+//#define EXTREME_VERBOSITY // - uncomment for debugging purposes
 
 int main()
 {
+    bool perform_packet_randomization = false;
+
     try
     {
         RawSocket sock(ETH_P_ALL);
@@ -38,11 +40,59 @@ int main()
 
         Fuzzer<struct tcphdr> interfuzzer(
             tcp_header,
-            [&sock, raw_bytes, data_to_send]
+            [&sock, raw_bytes, data_to_send, perform_packet_randomization]
             (std::shared_ptr<struct tcphdr>& _ptr, size_t sz,
                  uint32_t thr_id, double frequency) -> void
             {
                 PrettyPrint::PrintInfo("Thread [%u] is now online.", thr_id);
+
+                if(!perform_packet_randomization)
+                {
+                    const uint64_t thread_step          = (1ull << 20ull);
+                    const uint64_t thread_lower_bound   = (thr_id * thread_step);
+                    const uint64_t thread_upper_bound   = ((thr_id + 1) * thread_step);
+                    const uint64_t multiplier           = 0x4000;
+                    int64_t result                      = 0;
+
+                    for(uint64_t i = thread_lower_bound; i < thread_upper_bound; ++i)
+                    {
+                        for(uint64_t ctr = 0ull; ctr < multiplier; ++ctr)
+                        {
+                            result = sock.WritePacket(raw_bytes);
+                            
+                            #ifdef EXTREME_VERBOSITY
+                            if(result != 0)
+                            {
+                                PrettyPrint::PrintError(
+                                    "Could not send packet [%d] from thread [%d] with result [%d] and error [%d].",
+                                    i, thr_id, result, errno);
+                            
+                                uint8_t dump_buf[512u] = {};
+                                for(uint16_t i = 0; i < raw_bytes.size(); ++i)
+                                {
+                                    char buf[6] = {};
+                                    snprintf(buf, 5, " %02x", raw_bytes[i]);
+                                    strcat((char*)dump_buf, buf);
+                                }
+
+                                PrettyPrint::PrintDebug((char*)dump_buf);
+                            }
+                            #endif
+
+                            if(frequency != 1.0)
+                            {
+                                std::this_thread::sleep_for(
+                                    std::chrono::milliseconds(
+                                        static_cast<int64_t>(std::ceil((1.0 / frequency) * 1000))
+                                    )
+                                );
+                            }
+                        }
+                    }
+
+                    PrettyPrint::PrintInfo("Thread [%u] has finished.", thr_id);
+                    return;
+                }
 
                 const uint64_t random_case_per_test = 0x4000llu;
                 int64_t  result                     = 0x0llu;
@@ -157,10 +207,10 @@ int main()
                         
                         #else
                         result = sock.WritePacket(backup_vector);
+                        #endif
 
                         if(result == full_size)
                             ++ packets_sent;
-                        #endif
                     }
 
                     if(frequency != 1.0)
